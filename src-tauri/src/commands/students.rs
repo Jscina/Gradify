@@ -1,5 +1,4 @@
 use crate::{database::models::Student, AppState};
-use sqlx::Error;
 use tauri::State;
 use tokio::sync::Mutex;
 
