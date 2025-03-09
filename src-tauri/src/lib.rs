@@ -1,21 +1,20 @@
-use sqlx::SqlitePool;
+use crate::database::db::Database;
 use tauri::{async_runtime, Manager};
 use tauri_plugin_fs::FsExt;
 use tokio::{fs, sync::Mutex};
 
-struct Database {
-    pool: SqlitePool,
+mod database {
+    pub mod db;
+    pub mod models;
 }
 
-impl Database {
-    async fn new(url: &str) -> Self {
-        let pool = SqlitePool::connect(url).await.expect("Can't connect to db");
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .expect("Can't run migrations");
-        Self { pool }
-    }
+mod commands {
+    pub mod assignments;
+    pub mod classes;
+    pub mod grades;
+    pub mod overall_grades;
+    pub mod student_classes;
+    pub mod students;
 }
 
 struct AppState {
@@ -57,7 +56,32 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::students::create_student,
+            commands::students::get_student,
+            commands::students::get_all_students,
+            commands::students::update_student,
+            commands::students::delete_student,
+            commands::grades::create_grade,
+            commands::grades::get_grade,
+            commands::grades::get_all_grades,
+            commands::grades::update_grade,
+            commands::grades::delete_grade,
+            commands::classes::create_class,
+            commands::classes::get_class,
+            commands::classes::get_all_classes,
+            commands::classes::update_class,
+            commands::classes::delete_class,
+            commands::assignments::create_assignment,
+            commands::assignments::get_assignment,
+            commands::assignments::get_all_assignments,
+            commands::assignments::update_assignment,
+            commands::assignments::delete_assignment,
+            commands::student_classes::enroll_student,
+            commands::student_classes::get_enrollments,
+            commands::student_classes::unenroll_student,
+            commands::overall_grades::get_overall_grades
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
