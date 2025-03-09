@@ -92,7 +92,7 @@ function App() {
       <header className="sticky top-0 z-10 border-b bg-white dark:bg-gray-950 px-6 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            GradeTracker
+            Gradify
           </h1>
           <div className="flex items-center gap-4">
             <Button
