@@ -10,14 +10,24 @@ pub async fn create_student(
     email: Option<String>,
 ) -> Result<Student, String> {
     let state = state.lock().await;
-    let student = sqlx::query_as::<_, Student>(
+
+    let result = sqlx::query(
         "INSERT INTO STUDENTS (FIRST_NAME, LAST_NAME, EMAIL)
-         VALUES (?, ?, ?)
-         RETURNING ID, FIRST_NAME, LAST_NAME, EMAIL",
+         VALUES (?, ?, ?)",
     )
-    .bind(first_name)
-    .bind(last_name)
-    .bind(email)
+    .bind(first_name.clone())
+    .bind(last_name.clone())
+    .bind(&email)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let id = result.last_insert_rowid();
+
+    let student = sqlx::query_as::<_, Student>(
+        "SELECT ID, FIRST_NAME, LAST_NAME, EMAIL FROM STUDENTS WHERE ID = ?",
+    )
+    .bind(id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
@@ -60,15 +70,23 @@ pub async fn update_student(
     email: Option<String>,
 ) -> Result<Student, String> {
     let state = state.lock().await;
-    let student = sqlx::query_as::<_, Student>(
+
+    sqlx::query(
         "UPDATE STUDENTS
          SET FIRST_NAME = ?, LAST_NAME = ?, EMAIL = ?
-         WHERE ID = ?
-         RETURNING ID, FIRST_NAME, LAST_NAME, EMAIL",
+         WHERE ID = ?",
     )
-    .bind(first_name)
-    .bind(last_name)
-    .bind(email)
+    .bind(&first_name)
+    .bind(&last_name)
+    .bind(&email)
+    .bind(id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let student = sqlx::query_as::<_, Student>(
+        "SELECT ID, FIRST_NAME, LAST_NAME, EMAIL FROM STUDENTS WHERE ID = ?",
+    )
     .bind(id)
     .fetch_one(&state.db.pool)
     .await

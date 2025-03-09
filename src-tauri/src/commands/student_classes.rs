@@ -9,16 +9,27 @@ pub async fn enroll_student(
     class_id: i64,
 ) -> Result<StudentClass, String> {
     let state = state.lock().await;
-    let enrollment = sqlx::query_as::<_, StudentClass>(
+
+    sqlx::query(
         "INSERT INTO STUDENT_CLASSES (STUDENT_ID, CLASS_ID)
-         VALUES (?, ?)
-         RETURNING STUDENT_ID, CLASS_ID",
+         VALUES (?, ?)",
+    )
+    .bind(student_id)
+    .bind(class_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let enrollment = sqlx::query_as::<_, StudentClass>(
+        "SELECT STUDENT_ID, CLASS_ID FROM STUDENT_CLASSES
+         WHERE STUDENT_ID = ? AND CLASS_ID = ?",
     )
     .bind(student_id)
     .bind(class_id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
     Ok(enrollment)
 }
 

@@ -39,7 +39,7 @@ pub fn run() {
                 .allow_directory(&db_path, true)
                 .expect("Can't allow db dir");
             async_runtime::block_on(async {
-                if !db_path.exists() {
+                if !db_path.join("db.sqlite").exists() {
                     fs::create_dir_all(&db_path)
                         .await
                         .expect("Can't create db dir");

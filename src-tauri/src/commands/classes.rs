@@ -9,16 +9,26 @@ pub async fn create_class(
     description: Option<String>,
 ) -> Result<Class, String> {
     let state = state.lock().await;
-    let class = sqlx::query_as::<_, Class>(
+
+    let result = sqlx::query(
         "INSERT INTO CLASSES (CLASS_NAME, DESCRIPTION)
-         VALUES (?, ?)
-         RETURNING ID, CLASS_NAME, DESCRIPTION",
+         VALUES (?, ?)",
     )
-    .bind(class_name)
-    .bind(description)
-    .fetch_one(&state.db.pool)
+    .bind(&class_name)
+    .bind(&description)
+    .execute(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
+    let id = result.last_insert_rowid();
+
+    let class =
+        sqlx::query_as::<_, Class>("SELECT ID, CLASS_NAME, DESCRIPTION FROM CLASSES WHERE ID = ?")
+            .bind(id)
+            .fetch_one(&state.db.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
     Ok(class)
 }
 
@@ -52,18 +62,26 @@ pub async fn update_class(
     description: Option<String>,
 ) -> Result<Class, String> {
     let state = state.lock().await;
-    let class = sqlx::query_as::<_, Class>(
+
+    sqlx::query(
         "UPDATE CLASSES
          SET CLASS_NAME = ?, DESCRIPTION = ?
-         WHERE ID = ?
-         RETURNING ID, CLASS_NAME, DESCRIPTION",
+         WHERE ID = ?",
     )
-    .bind(class_name)
-    .bind(description)
+    .bind(&class_name)
+    .bind(&description)
     .bind(id)
-    .fetch_one(&state.db.pool)
+    .execute(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
+    let class =
+        sqlx::query_as::<_, Class>("SELECT ID, CLASS_NAME, DESCRIPTION FROM CLASSES WHERE ID = ?")
+            .bind(id)
+            .fetch_one(&state.db.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
     Ok(class)
 }
 

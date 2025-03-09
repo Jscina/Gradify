@@ -10,17 +10,28 @@ pub async fn create_grade(
     score: f64,
 ) -> Result<Grade, String> {
     let state = state.lock().await;
-    let grade = sqlx::query_as::<_, Grade>(
+
+    sqlx::query(
         "INSERT INTO GRADES (STUDENT_ID, ASSIGNMENT_ID, SCORE)
-         VALUES (?, ?, ?)
-         RETURNING STUDENT_ID, ASSIGNMENT_ID, SCORE",
+         VALUES (?, ?, ?)",
     )
     .bind(student_id)
     .bind(assignment_id)
     .bind(score)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let grade = sqlx::query_as::<_, Grade>(
+        "SELECT STUDENT_ID, ASSIGNMENT_ID, SCORE FROM GRADES
+         WHERE STUDENT_ID = ? AND ASSIGNMENT_ID = ?",
+    )
+    .bind(student_id)
+    .bind(assignment_id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
     Ok(grade)
 }
 
@@ -61,18 +72,29 @@ pub async fn update_grade(
     score: f64,
 ) -> Result<Grade, String> {
     let state = state.lock().await;
-    let grade = sqlx::query_as::<_, Grade>(
+
+    sqlx::query(
         "UPDATE GRADES 
          SET SCORE = ? 
-         WHERE STUDENT_ID = ? AND ASSIGNMENT_ID = ?
-         RETURNING STUDENT_ID, ASSIGNMENT_ID, SCORE",
+         WHERE STUDENT_ID = ? AND ASSIGNMENT_ID = ?",
     )
     .bind(score)
+    .bind(student_id)
+    .bind(assignment_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let grade = sqlx::query_as::<_, Grade>(
+        "SELECT STUDENT_ID, ASSIGNMENT_ID, SCORE FROM GRADES
+         WHERE STUDENT_ID = ? AND ASSIGNMENT_ID = ?",
+    )
     .bind(student_id)
     .bind(assignment_id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
     Ok(grade)
 }
 

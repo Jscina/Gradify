@@ -13,19 +13,32 @@ pub async fn create_assignment(
     due_date: Option<NaiveDateTime>,
 ) -> Result<Assignment, String> {
     let state = state.lock().await;
-    let assignment = sqlx::query_as::<_, Assignment>(
+
+    let result = sqlx::query(
         "INSERT INTO ASSIGNMENTS (CLASS_ID, ASSIGNMENT_NAME, ASSIGNMENT_TYPE, MAXIMUM_SCORE, DUE_DATE)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING ID, CLASS_ID, ASSIGNMENT_NAME, ASSIGNMENT_TYPE, MAXIMUM_SCORE, DUE_DATE"
+         VALUES (?, ?, ?, ?, ?)"
     )
     .bind(class_id)
-    .bind(assignment_name)
-    .bind(assignment_type)
+    .bind(&assignment_name)
+    .bind(&assignment_type)
     .bind(maximum_score)
     .bind(due_date)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let id = result.last_insert_rowid();
+
+    let assignment = sqlx::query_as::<_, Assignment>(
+        "SELECT ID, CLASS_ID, ASSIGNMENT_NAME, ASSIGNMENT_TYPE, MAXIMUM_SCORE, DUE_DATE 
+         FROM ASSIGNMENTS
+         WHERE ID = ?",
+    )
+    .bind(id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
     Ok(assignment)
 }
 
@@ -73,21 +86,32 @@ pub async fn update_assignment(
     due_date: Option<NaiveDateTime>,
 ) -> Result<Assignment, String> {
     let state = state.lock().await;
-    let assignment = sqlx::query_as::<_, Assignment>(
+
+    sqlx::query(
         "UPDATE ASSIGNMENTS
          SET CLASS_ID = ?, ASSIGNMENT_NAME = ?, ASSIGNMENT_TYPE = ?, MAXIMUM_SCORE = ?, DUE_DATE = ?
-         WHERE ID = ?
-         RETURNING ID, CLASS_ID, ASSIGNMENT_NAME, ASSIGNMENT_TYPE, MAXIMUM_SCORE, DUE_DATE",
+         WHERE ID = ?",
     )
     .bind(class_id)
-    .bind(assignment_name)
-    .bind(assignment_type)
+    .bind(&assignment_name)
+    .bind(&assignment_type)
     .bind(maximum_score)
     .bind(due_date)
+    .bind(id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let assignment = sqlx::query_as::<_, Assignment>(
+        "SELECT ID, CLASS_ID, ASSIGNMENT_NAME, ASSIGNMENT_TYPE, MAXIMUM_SCORE, DUE_DATE 
+         FROM ASSIGNMENTS
+         WHERE ID = ?",
+    )
     .bind(id)
     .fetch_one(&state.db.pool)
     .await
     .map_err(|e| e.to_string())?;
+
     Ok(assignment)
 }
 
