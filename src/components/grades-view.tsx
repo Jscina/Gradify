@@ -34,20 +34,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Search, ChevronDown, AlertCircle } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { PlusCircle, Search, Pencil, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { createGrade, updateGrade, getGrade } from "@/api/grades";
-import { enrollStudent, unenrollStudent } from "@/api/student-classes";
-import type { OverallGrade, Student, Class, Assignment } from "@/api/types";
+import { createGrade, updateGrade, getGrade, getAllGrades } from "@/api/grades";
+import {
+  enrollStudent,
+  unenrollStudent,
+  getEnrollments,
+} from "@/api/student-classes";
+import type {
+  OverallGrade,
+  Student,
+  Class,
+  Assignment,
+  StudentClass,
+  Grade,
+} from "@/api/types";
 
 interface GradesViewProps {
   grades: OverallGrade[];
@@ -66,16 +69,14 @@ export default function GradesView({
   refreshData,
   loading,
 }: GradesViewProps) {
-  // State for filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
 
-  // Dialog states
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [isUnenrollDialogOpen, setIsUnenrollDialogOpen] = useState(false);
+  const [isEditGradeDialogOpen, setIsEditGradeDialogOpen] = useState(false);
 
-  // Form states
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(
     null,
@@ -83,8 +84,9 @@ export default function GradesView({
   const [score, setScore] = useState<number>(0);
   const [enrollStudentId, setEnrollStudentId] = useState<number | null>(null);
   const [enrollClassId, setEnrollClassId] = useState<number | null>(null);
+  const [editingGrades, setEditingGrades] = useState<Grade[]>([]);
+  const [allGrades, setAllGrades] = useState<Grade[]>([]);
 
-  // Unenroll states
   const [studentToUnenroll, setStudentToUnenroll] = useState<{
     id: number;
     name: string;
@@ -94,18 +96,39 @@ export default function GradesView({
     name: string;
   } | null>(null);
 
-  // Error state
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [enrollments, setEnrollments] = useState<StudentClass[]>([]);
 
-  // Update enrollment class ID when selected class changes
+  const loadEnrollments = async () => {
+    try {
+      const allEnrollments = await getEnrollments();
+      setEnrollments(allEnrollments);
+    } catch (error) {
+      console.error("Error loading enrollments:", error);
+    }
+  };
+
+  const loadAllGrades = async () => {
+    try {
+      const grades = await getAllGrades();
+      setAllGrades(grades);
+    } catch (error) {
+      console.error("Error loading grades:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadEnrollments();
+    loadAllGrades();
+  }, []);
+
   useEffect(() => {
     if (selectedClass) {
       setEnrollClassId(selectedClass);
     }
   }, [selectedClass]);
 
-  // Filter grades based on search query and selected class
   const filteredGrades = grades.filter((grade) => {
     const student = students.find((s) => s.id === grade.student_id);
     const classItem = classes.find((c) => c.id === grade.class_id);
@@ -126,19 +149,26 @@ export default function GradesView({
     return matchesSearch && matchesClass;
   });
 
-  // Get student name by ID
   const getStudentName = (studentId: number): string => {
     const student = students.find((s) => s.id === studentId);
     return student ? `${student.first_name} ${student.last_name}` : "Unknown";
   };
 
-  // Get class name by ID
   const getClassName = (classId: number): string => {
     const classItem = classes.find((c) => c.id === classId);
     return classItem ? classItem.class_name : "Unknown";
   };
 
-  // Get letter grade color
+  const getAssignmentName = (assignmentId: number): string => {
+    const assignment = assignments.find((a) => a.id === assignmentId);
+    return assignment ? assignment.assignment_name : "Unknown";
+  };
+
+  const getAssignmentMaxScore = (assignmentId: number): number => {
+    const assignment = assignments.find((a) => a.id === assignmentId);
+    return assignment ? assignment.maximum_score : 0;
+  };
+
   const getLetterGradeColor = (letterGrade: string): string => {
     switch (letterGrade) {
       case "A":
@@ -164,33 +194,47 @@ export default function GradesView({
     }
   };
 
-  // Get assignments for a class
   const getAssignmentsForClass = (classId: number) => {
     return assignments.filter((a) => a.class_id === classId);
   };
 
-  // Get students enrolled in a class
+  const getStudentGrades = (studentId: number, classId: number) => {
+    const classAssignments = getAssignmentsForClass(classId);
+    const studentGrades: Grade[] = [];
+
+    for (const assignment of classAssignments) {
+      const existingGrade = allGrades.find(
+        (g) => g.student_id === studentId && g.assignment_id === assignment.id,
+      );
+
+      if (existingGrade) {
+        studentGrades.push(existingGrade);
+      }
+    }
+
+    return studentGrades;
+  };
+
   const getStudentsInClass = (classId: number) => {
+    const enrolledStudentIds = enrollments
+      .filter((enrollment) => enrollment.class_id === classId)
+      .map((enrollment) => enrollment.student_id);
+
     return students.filter((student) =>
-      grades.some(
-        (grade) =>
-          grade.student_id === student.id && grade.class_id === classId,
-      ),
+      enrolledStudentIds.includes(student.id),
     );
   };
 
-  // Get students not enrolled in a class
   const getStudentsNotInClass = (classId: number) => {
-    const enrolledStudentIds = grades
-      .filter((grade) => grade.class_id === classId)
-      .map((grade) => grade.student_id);
+    const enrolledStudentIds = enrollments
+      .filter((enrollment) => enrollment.class_id === classId)
+      .map((enrollment) => enrollment.student_id);
 
     return students.filter(
       (student) => !enrolledStudentIds.includes(student.id),
     );
   };
 
-  // Reset form and open grade dialog
   const openGradeDialog = () => {
     setSelectedStudent(null);
     setSelectedAssignment(null);
@@ -199,7 +243,15 @@ export default function GradesView({
     setIsGradeDialogOpen(true);
   };
 
-  // Open enroll dialog
+  const openEditGradesDialog = (studentId: number, classId: number) => {
+    const studentGrades = getStudentGrades(studentId, classId);
+    setEditingGrades(studentGrades);
+    setSelectedStudent(studentId);
+    setSelectedClass(classId);
+    setError(null);
+    setIsEditGradeDialogOpen(true);
+  };
+
   const openEnrollDialog = () => {
     if (!selectedClass) {
       return;
@@ -211,7 +263,6 @@ export default function GradesView({
     setIsEnrollDialogOpen(true);
   };
 
-  // Open unenroll dialog for a specific student
   const openUnenrollDialog = (studentId: number, classId: number) => {
     const student = students.find((s) => s.id === studentId);
     const classItem = classes.find((c) => c.id === classId);
@@ -235,7 +286,6 @@ export default function GradesView({
     setIsUnenrollDialogOpen(true);
   };
 
-  // Handle add/update grade
   const handleGradeSubmit = async () => {
     if (!selectedStudent || !selectedAssignment) return;
 
@@ -243,17 +293,15 @@ export default function GradesView({
     setError(null);
 
     try {
-      // Try to check if grade exists
       try {
         await getGrade(selectedStudent, selectedAssignment);
-        // If we get here, the grade exists, so update it
         await updateGrade(selectedStudent, selectedAssignment, score);
       } catch (error) {
-        // Grade doesn't exist, create a new one
         await createGrade(selectedStudent, selectedAssignment, score);
       }
 
       await refreshData();
+      await loadAllGrades();
       setIsGradeDialogOpen(false);
     } catch (error) {
       console.error("Error saving grade:", error);
@@ -263,7 +311,31 @@ export default function GradesView({
     }
   };
 
-  // Handle enroll student
+  const handleGradeChange = (index: number, newScore: number) => {
+    const updatedGrades = [...editingGrades];
+    updatedGrades[index] = { ...updatedGrades[index], score: newScore };
+    setEditingGrades(updatedGrades);
+  };
+
+  const handleUpdateGrades = async () => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      for (const grade of editingGrades) {
+        await updateGrade(grade.student_id, grade.assignment_id, grade.score);
+      }
+      await refreshData();
+      await loadAllGrades();
+      setIsEditGradeDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating grades:", error);
+      setError("Failed to update grades. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleEnrollStudent = async () => {
     if (!enrollStudentId || !enrollClassId) return;
 
@@ -273,6 +345,7 @@ export default function GradesView({
     try {
       await enrollStudent(enrollStudentId, enrollClassId);
       await refreshData();
+      await loadEnrollments();
       setIsEnrollDialogOpen(false);
     } catch (error) {
       console.error("Error enrolling student:", error);
@@ -282,7 +355,6 @@ export default function GradesView({
     }
   };
 
-  // Handle unenroll student
   const handleUnenrollStudent = async () => {
     if (!studentToUnenroll || !classToUnenroll) return;
 
@@ -292,6 +364,7 @@ export default function GradesView({
     try {
       await unenrollStudent(studentToUnenroll.id, classToUnenroll.id);
       await refreshData();
+      await loadEnrollments();
       setIsUnenrollDialogOpen(false);
     } catch (error) {
       console.error("Error unenrolling student:", error);
@@ -320,7 +393,6 @@ export default function GradesView({
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -333,16 +405,16 @@ export default function GradesView({
           />
         </div>
         <Select
-          value={selectedClass?.toString() || ""}
+          value={selectedClass?.toString() || "all"}
           onValueChange={(value) =>
-            setSelectedClass(value ? parseInt(value) : null)
+            setSelectedClass(value === "all" ? null : parseInt(value))
           }
         >
           <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All Classes" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Classes</SelectItem>
+            <SelectItem value="all">All Classes</SelectItem>
             {classes.map((classItem) => (
               <SelectItem key={classItem.id} value={classItem.id.toString()}>
                 {classItem.class_name}
@@ -352,7 +424,6 @@ export default function GradesView({
         </Select>
       </div>
 
-      {/* Grades Table */}
       <Card>
         <CardHeader>
           <CardTitle>Student Grades</CardTitle>
@@ -398,27 +469,33 @@ export default function GradesView({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              Actions <ChevronDown className="ml-2 h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Grade Options</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openUnenrollDialog(
-                                  grade.student_id,
-                                  grade.class_id,
-                                )
-                              }
-                            >
-                              Unenroll from Class
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openEditGradesDialog(
+                                grade.student_id,
+                                grade.class_id,
+                              )
+                            }
+                          >
+                            <Pencil className="mr-1 h-3 w-3" />
+                            Edit Grades
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openUnenrollDialog(
+                                grade.student_id,
+                                grade.class_id,
+                              )
+                            }
+                          >
+                            Unenroll
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -445,7 +522,6 @@ export default function GradesView({
         </CardFooter>
       </Card>
 
-      {/* Add Grade Dialog */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -469,11 +545,11 @@ export default function GradesView({
                 Class
               </Label>
               <Select
-                value={selectedClass?.toString() || ""}
+                value={selectedClass?.toString() || "selectClass"}
                 onValueChange={(value) => {
+                  if (value === "selectClass") return;
                   const classId = parseInt(value);
                   setSelectedClass(classId);
-                  // Reset dependent fields
                   setSelectedStudent(null);
                   setSelectedAssignment(null);
                 }}
@@ -499,8 +575,12 @@ export default function GradesView({
                 Student
               </Label>
               <Select
-                value={selectedStudent?.toString() || ""}
-                onValueChange={(value) => setSelectedStudent(parseInt(value))}
+                value={selectedStudent?.toString() || "selectStudent"}
+                onValueChange={(value) => {
+                  if (value === "selectStudent" || value === "no-students")
+                    return;
+                  setSelectedStudent(parseInt(value));
+                }}
                 disabled={!selectedClass}
               >
                 <SelectTrigger className="col-span-3">
@@ -531,10 +611,15 @@ export default function GradesView({
                 Assignment
               </Label>
               <Select
-                value={selectedAssignment?.toString() || ""}
-                onValueChange={(value) =>
-                  setSelectedAssignment(parseInt(value))
-                }
+                value={selectedAssignment?.toString() || "selectAssignment"}
+                onValueChange={(value) => {
+                  if (
+                    value === "selectAssignment" ||
+                    value === "no-assignments"
+                  )
+                    return;
+                  setSelectedAssignment(parseInt(value));
+                }}
                 disabled={!selectedClass}
               >
                 <SelectTrigger className="col-span-3">
@@ -574,6 +659,11 @@ export default function GradesView({
                 step={0.1}
                 required
               />
+              {selectedAssignment && (
+                <div className="col-span-4 text-right text-sm text-gray-500">
+                  Maximum score: {getAssignmentMaxScore(selectedAssignment)}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -594,7 +684,89 @@ export default function GradesView({
         </DialogContent>
       </Dialog>
 
-      {/* Enroll Student Dialog */}
+      <Dialog
+        open={isEditGradeDialogOpen}
+        onOpenChange={setIsEditGradeDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Student Grades</DialogTitle>
+            <DialogDescription>
+              {selectedStudent && selectedClass
+                ? `Editing grades for ${getStudentName(selectedStudent)} in ${getClassName(selectedClass)}`
+                : "Edit grades for this student"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4 py-4 max-h-[300px] overflow-y-auto">
+            {editingGrades.length > 0 ? (
+              editingGrades.map((grade, index) => {
+                const maxScore = getAssignmentMaxScore(grade.assignment_id);
+                const percentage =
+                  maxScore > 0 ? (grade.score / maxScore) * 100 : 0;
+
+                return (
+                  <div
+                    key={grade.assignment_id}
+                    className="grid grid-cols-12 items-center gap-4"
+                  >
+                    <div className="col-span-5">
+                      <Label htmlFor={`grade-${index}`} className="font-medium">
+                        {getAssignmentName(grade.assignment_id)}
+                      </Label>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        id={`grade-${index}`}
+                        type="number"
+                        value={grade.score}
+                        onChange={(e) =>
+                          handleGradeChange(index, Number(e.target.value))
+                        }
+                        min={0}
+                        step={0.1}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-4 text-gray-500 text-sm">
+                      / {maxScore} ({percentage.toFixed(1)}%)
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-center text-gray-500">
+                No grades found for this student in this class.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditGradeDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateGrades}
+              disabled={editingGrades.length === 0 || isSubmitting}
+            >
+              {isSubmitting ? "Updating..." : "Update Grades"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEnrollDialogOpen} onOpenChange={setIsEnrollDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -619,8 +791,15 @@ export default function GradesView({
                 Student
               </Label>
               <Select
-                value={enrollStudentId?.toString() || ""}
-                onValueChange={(value) => setEnrollStudentId(parseInt(value))}
+                value={enrollStudentId?.toString() || "selectEnrollStudent"}
+                onValueChange={(value) => {
+                  if (
+                    value === "selectEnrollStudent" ||
+                    value === "all-enrolled"
+                  )
+                    return;
+                  setEnrollStudentId(parseInt(value));
+                }}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a student" />
@@ -663,7 +842,6 @@ export default function GradesView({
         </DialogContent>
       </Dialog>
 
-      {/* Unenroll Student Dialog */}
       <Dialog
         open={isUnenrollDialogOpen}
         onOpenChange={setIsUnenrollDialogOpen}

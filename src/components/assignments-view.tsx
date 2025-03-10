@@ -34,21 +34,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Pencil, Trash2, Search, CalendarIcon } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { PlusCircle, Pencil, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import {
   createAssignment,
   updateAssignment,
   deleteAssignment,
 } from "@/api/assignments";
 import type { Assignment, Class } from "@/api/types";
+import { DatePicker } from "./date-picker";
 
 interface AssignmentsViewProps {
   assignments: Assignment[];
@@ -72,21 +66,12 @@ export default function AssignmentsView({
   );
 
   const [assignmentName, setAssignmentName] = useState("");
-  const [assignmentType, setAssignmentType] = useState("");
+  const [assignmentType, setAssignmentType] = useState<string>("Homework");
   const [classId, setClassId] = useState<number | null>(null);
   const [maximumScore, setMaximumScore] = useState<number>(100);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
 
-  const assignmentTypes = [
-    "Homework",
-    "Quiz",
-    "Test",
-    "Exam",
-    "Project",
-    "Presentation",
-    "Participation",
-    "Other",
-  ];
+  const assignmentTypes = ["Homework", "Test"];
 
   const filteredAssignments = assignments.filter((assignment) => {
     const assignmentNameLower = assignment.assignment_name.toLowerCase();
@@ -105,12 +90,16 @@ export default function AssignmentsView({
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "No due date";
-    return format(new Date(dateString), "PPP");
+    try {
+      return format(new Date(dateString), "PPP");
+    } catch (error) {
+      return "Invalid date";
+    }
   };
 
   const openCreateDialog = () => {
     setAssignmentName("");
-    setAssignmentType("");
+    setAssignmentType("Homework");
     setClassId(null);
     setMaximumScore(100);
     setDueDate(undefined);
@@ -136,7 +125,10 @@ export default function AssignmentsView({
     if (!classId) return;
 
     try {
-      const dueDateString = dueDate ? dueDate.toISOString() : undefined;
+      let dueDateString = undefined;
+      if (dueDate) {
+        dueDateString = dueDate.toISOString().replace("Z", "");
+      }
 
       await createAssignment(
         classId,
@@ -156,7 +148,10 @@ export default function AssignmentsView({
     if (!currentAssignment || !classId) return;
 
     try {
-      const dueDateString = dueDate ? dueDate.toISOString() : undefined;
+      let dueDateString = undefined;
+      if (dueDate) {
+        dueDateString = dueDate.toISOString().replace("Z", "");
+      }
 
       await updateAssignment(
         currentAssignment.id,
@@ -320,8 +315,12 @@ export default function AssignmentsView({
                 Class
               </Label>
               <Select
-                value={classId?.toString()}
-                onValueChange={(value) => setClassId(parseInt(value))}
+                value={classId?.toString() || "selectClass"}
+                onValueChange={(value) => {
+                  if (value !== "selectClass") {
+                    setClassId(parseInt(value));
+                  }
+                }}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a class" />
@@ -342,7 +341,10 @@ export default function AssignmentsView({
               <Label htmlFor="assignmentType" className="text-right">
                 Type
               </Label>
-              <Select value={assignmentType} onValueChange={setAssignmentType}>
+              <Select
+                value={assignmentType || "Homework"}
+                onValueChange={(value) => setAssignmentType(value)}
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a type" />
                 </SelectTrigger>
@@ -374,32 +376,7 @@ export default function AssignmentsView({
                 Due Date
               </Label>
               <div className="col-span-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDate && "text-muted-foreground",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? (
-                        format(dueDate, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker value={dueDate} onChange={setDueDate} />
               </div>
             </div>
           </div>
@@ -446,8 +423,12 @@ export default function AssignmentsView({
                 Class
               </Label>
               <Select
-                value={classId?.toString()}
-                onValueChange={(value) => setClassId(parseInt(value))}
+                value={classId?.toString() || "selectClass"}
+                onValueChange={(value) => {
+                  if (value !== "selectClass") {
+                    setClassId(parseInt(value));
+                  }
+                }}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a class" />
@@ -468,7 +449,10 @@ export default function AssignmentsView({
               <Label htmlFor="edit-assignmentType" className="text-right">
                 Type
               </Label>
-              <Select value={assignmentType} onValueChange={setAssignmentType}>
+              <Select
+                value={assignmentType || "Homework"}
+                onValueChange={(value) => setAssignmentType(value)}
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a type" />
                 </SelectTrigger>
@@ -500,32 +484,7 @@ export default function AssignmentsView({
                 Due Date
               </Label>
               <div className="col-span-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDate && "text-muted-foreground",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? (
-                        format(dueDate, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker value={dueDate} onChange={setDueDate} />
               </div>
             </div>
           </div>

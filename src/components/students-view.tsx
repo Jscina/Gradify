@@ -51,6 +51,9 @@ export default function StudentsView({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [firstNameError, setFirstNameError] = useState("");
+  const [lastNameError, setLastNameError] = useState("");
 
   const filteredStudents = students.filter((student) => {
     const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
@@ -60,10 +63,66 @@ export default function StudentsView({
     return fullName.includes(query) || emailLower.includes(query);
   });
 
+  const validateFirstName = (value: string) => {
+    if (!value.trim()) {
+      setFirstNameError("First name is required");
+      return false;
+    }
+    if (value.length > 50) {
+      setFirstNameError("First name cannot exceed 50 characters");
+      return false;
+    }
+    setFirstNameError("");
+    return true;
+  };
+
+  const validateLastName = (value: string) => {
+    if (!value.trim()) {
+      setLastNameError("Last name is required");
+      return false;
+    }
+    if (value.length > 50) {
+      setLastNameError("Last name cannot exceed 50 characters");
+      return false;
+    }
+    setLastNameError("");
+    return true;
+  };
+
+  const validateEmail = (emailValue: string, studentId?: number) => {
+    if (!emailValue) {
+      setEmailError("");
+      return true;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      setEmailError("Please enter a valid email address");
+      return false;
+    }
+
+    const isDuplicate = students.some(
+      (student) =>
+        student.email?.toLowerCase() === emailValue.toLowerCase() &&
+        student.id !== studentId,
+    );
+
+    if (isDuplicate) {
+      setEmailError("This email is already in use");
+      return false;
+    }
+
+    setEmailError("");
+    return true;
+  };
+
   const openCreateDialog = () => {
     setFirstName("");
     setLastName("");
     setEmail("");
+    setEmailError("");
+    setFirstNameError("");
+    setLastNameError("");
     setIsCreateDialogOpen(true);
   };
 
@@ -72,6 +131,9 @@ export default function StudentsView({
     setFirstName(student.first_name);
     setLastName(student.last_name);
     setEmail(student.email || "");
+    setEmailError("");
+    setFirstNameError("");
+    setLastNameError("");
     setIsEditDialogOpen(true);
   };
 
@@ -81,6 +143,12 @@ export default function StudentsView({
   };
 
   const handleCreateStudent = async () => {
+    const isFirstNameValid = validateFirstName(firstName);
+    const isLastNameValid = validateLastName(lastName);
+    const isEmailValid = validateEmail(email);
+
+    if (!isFirstNameValid || !isLastNameValid || !isEmailValid) return;
+
     try {
       await createStudent(firstName, lastName, email || undefined);
       await refreshData();
@@ -92,6 +160,12 @@ export default function StudentsView({
 
   const handleUpdateStudent = async () => {
     if (!currentStudent) return;
+
+    const isFirstNameValid = validateFirstName(firstName);
+    const isLastNameValid = validateLastName(lastName);
+    const isEmailValid = validateEmail(email, currentStudent.id);
+
+    if (!isFirstNameValid || !isLastNameValid || !isEmailValid) return;
 
     try {
       await updateStudent(
@@ -117,6 +191,24 @@ export default function StudentsView({
     } catch (error) {
       console.error("Error deleting student:", error);
     }
+  };
+
+  const handleFirstNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFirstName(value);
+    validateFirstName(value);
+  };
+
+  const handleLastNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLastName(value);
+    validateLastName(value);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    validateEmail(value, currentStudent?.id);
   };
 
   return (
@@ -235,37 +327,50 @@ export default function StudentsView({
               <Label htmlFor="firstName" className="text-right">
                 First Name
               </Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="col-span-3"
-                required
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={handleFirstNameChange}
+                  className={firstNameError ? "border-red-500" : ""}
+                />
+                {firstNameError && (
+                  <p className="text-xs text-red-500">{firstNameError}</p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="lastName" className="text-right">
                 Last Name
               </Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="col-span-3"
-                required
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={handleLastNameChange}
+                  className={lastNameError ? "border-red-500" : ""}
+                />
+                {lastNameError && (
+                  <p className="text-xs text-red-500">{lastNameError}</p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
                 Email
               </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="col-span-3"
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  className={emailError ? "border-red-500" : ""}
+                />
+                {emailError && (
+                  <p className="text-xs text-red-500">{emailError}</p>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -277,7 +382,13 @@ export default function StudentsView({
             </Button>
             <Button
               onClick={handleCreateStudent}
-              disabled={!firstName || !lastName}
+              disabled={
+                !firstName ||
+                !lastName ||
+                !!firstNameError ||
+                !!lastNameError ||
+                !!emailError
+              }
             >
               Create Student
             </Button>
@@ -298,37 +409,50 @@ export default function StudentsView({
               <Label htmlFor="edit-firstName" className="text-right">
                 First Name
               </Label>
-              <Input
-                id="edit-firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="col-span-3"
-                required
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="edit-firstName"
+                  value={firstName}
+                  onChange={handleFirstNameChange}
+                  className={firstNameError ? "border-red-500" : ""}
+                />
+                {firstNameError && (
+                  <p className="text-xs text-red-500">{firstNameError}</p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-lastName" className="text-right">
                 Last Name
               </Label>
-              <Input
-                id="edit-lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="col-span-3"
-                required
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="edit-lastName"
+                  value={lastName}
+                  onChange={handleLastNameChange}
+                  className={lastNameError ? "border-red-500" : ""}
+                />
+                {lastNameError && (
+                  <p className="text-xs text-red-500">{lastNameError}</p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-email" className="text-right">
                 Email
               </Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="col-span-3"
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  className={emailError ? "border-red-500" : ""}
+                />
+                {emailError && (
+                  <p className="text-xs text-red-500">{emailError}</p>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -340,7 +464,13 @@ export default function StudentsView({
             </Button>
             <Button
               onClick={handleUpdateStudent}
-              disabled={!firstName || !lastName}
+              disabled={
+                !firstName ||
+                !lastName ||
+                !!firstNameError ||
+                !!lastNameError ||
+                !!emailError
+              }
             >
               Update Student
             </Button>
