@@ -17,6 +17,8 @@ import DashboardView from "@/components/dashboard-view";
 
 import type { Student, Class, Assignment, OverallGrade } from "@/api/types";
 import "./app.css";
+import { faSun, faMoon } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 function App() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -26,6 +28,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isDarkMode, setIsDarkMode] = useState(
+    document.body.classList.contains("dark"),
+  );
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setIsDarkMode(document.body.classList.contains("dark"));
+    };
+
+    document.body.addEventListener("classChange", handleThemeChange);
+
+    return () => {
+      document.body.removeEventListener("classChange", handleThemeChange);
+    };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -100,9 +117,14 @@ function App() {
               size="sm"
               onClick={() => {
                 document.body.classList.toggle("dark");
+                setIsDarkMode(!isDarkMode);
               }}
             >
-              Theme
+              {isDarkMode ? (
+                <FontAwesomeIcon icon={faMoon} />
+              ) : (
+                <FontAwesomeIcon icon={faSun} />
+              )}
             </Button>
           </div>
         </div>

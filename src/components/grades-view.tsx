@@ -652,7 +652,7 @@ export default function GradesView({
               <Input
                 id="gradeScore"
                 type="number"
-                value={score}
+                value={score === 0 ? "" : score}
                 onChange={(e) => setScore(Number(e.target.value))}
                 className="col-span-3"
                 min={0}
@@ -727,7 +727,7 @@ export default function GradesView({
                       <Input
                         id={`grade-${index}`}
                         type="number"
-                        value={grade.score}
+                        value={grade.score === 0 ? "" : grade.score}
                         onChange={(e) =>
                           handleGradeChange(index, Number(e.target.value))
                         }

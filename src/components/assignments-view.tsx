@@ -364,7 +364,7 @@ export default function AssignmentsView({
               <Input
                 id="maximumScore"
                 type="number"
-                value={maximumScore}
+                value={maximumScore === 0 ? "" : maximumScore}
                 onChange={(e) => setMaximumScore(Number(e.target.value))}
                 className="col-span-3"
                 min={0}
@@ -472,10 +472,11 @@ export default function AssignmentsView({
               <Input
                 id="edit-maximumScore"
                 type="number"
-                value={maximumScore}
+                value={maximumScore === 0 ? "" : maximumScore}
                 onChange={(e) => setMaximumScore(Number(e.target.value))}
                 className="col-span-3"
                 min={0}
+                placeholder="Enter Maximum Score"
                 required
               />
             </div>
