@@ -64,8 +64,8 @@ OutFile "${OUTFILE}"
 
 ; ─────────────────────────────────────────────────────────────────────────
 ; CUSTOM: Force install to C:\Gradify for everyone
-!define PLACEHOLDER_INSTALL_DIR "C:\\Gradify"
-InstallDir "C:\\Gradify"
+!define PLACEHOLDER_INSTALL_DIR "C:\Gradify"
+InstallDir "C:\Gradify"
 InstallDirRegKey HKCU "Software\\Gradify" "Install_Dir"
 ; ─────────────────────────────────────────────────────────────────────────
 
@@ -129,15 +129,18 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_WELCOME
+!undef MUI_PAGE_CUSTOMFUNCTION_PRE
 
 !if "${LICENSE}" != ""
   !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
+  !undef MUI_PAGE_CUSTOMFUNCTION_PRE
 !endif
 
 !if "${INSTALLMODE}" == "both"
   !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MULTIUSER_PAGE_INSTALLMODE
+  !undef MUI_PAGE_CUSTOMFUNCTION_PRE
 !endif
 
 Var ReinstallPageCheck
@@ -298,14 +301,16 @@ Function PageLeaveReinstall
 FunctionEnd
 
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!insertmacro MUI_PAGE_DIRECTORY
+!undef MUI_PAGE_CUSTOMFUNCTION_PRE
 
 Var AppStartMenuFolder
 !if "${STARTMENUFOLDER}" != ""
   !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !define MUI_STARTMENUPAGE_DEFAULTFOLDER "${STARTMENUFOLDER}"
+!undef MUI_PAGE_CUSTOMFUNCTION_PRE
 !else
   !define MUI_PAGE_CUSTOMFUNCTION_PRE Skip
+  !undef MUI_PAGE_CUSTOMFUNCTION_PRE
 !endif
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
@@ -318,6 +323,8 @@ Var AppStartMenuFolder
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!undef MUI_PAGE_CUSTOMFUNCTION_PRE
+
 !insertmacro MUI_PAGE_FINISH
 
 Function RunMainBinary
@@ -384,13 +391,9 @@ Function .onInit
 
   !insertmacro SetContext
 
-  ; ─────────────────────────────────────────────────────────────────────────
-  ; CUSTOM: comment out the code that overwrote our "C:\Gradify" choice
   ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
-    ; (Original Tauri code that set $INSTDIR=$PROGRAMFILES is removed/commented)
-    ; Call RestorePreviousInstallLocation
+    Call RestorePreviousInstallLocation
   ${EndIf}
-  ; ─────────────────────────────────────────────────────────────────────────
 
   !if "${INSTALLMODE}" == "both"
     !insertmacro MULTIUSER_INIT
