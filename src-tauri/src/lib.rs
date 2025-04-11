@@ -34,22 +34,27 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let scope = app.fs_scope();
-            let db_path = app.path().app_data_dir().expect("Can't get app data dir");
+
+            let exe_path = std::env::current_exe().expect("Can't get exe path");
+            let install_dir = exe_path
+                .parent()
+                .expect("Can't find parent dir")
+                .to_path_buf();
+            let db_path = install_dir.join("db.sqlite");
+
             scope
-                .allow_directory(&db_path, true)
-                .expect("Can't allow db dir");
+                .allow_directory(&install_dir, true)
+                .expect("Can't allow install dir");
+
             async_runtime::block_on(async {
-                if !db_path.join("db.sqlite").exists() {
-                    fs::create_dir_all(&db_path)
-                        .await
-                        .expect("Can't create db dir");
-                    fs::write(db_path.join("db.sqlite"), b"")
+                if !db_path.exists() {
+                    fs::write(&db_path, b"")
                         .await
                         .expect("Can't create db file");
                 }
 
-                let db_url = format!("sqlite://{}/db.sqlite", db_path.display());
-                let db = Database::new(db_url.as_str()).await;
+                let db_url = format!("sqlite://{}", db_path.display());
+                let db = Database::new(&db_url).await;
                 let state = AppState::new(db);
                 app.manage(Mutex::new(state));
             });
