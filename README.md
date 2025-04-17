@@ -11,7 +11,6 @@ This project was developed as the final submission for an Applied Programming co
 - **Student & Assignment Management:** Add/edit students, classes, and assignment categories
 - **Grade Tracking:** Enter grades with support for weighted categories
 - **Statistics Dashboard:** Get an overview of student performance and class averages
-- **Export Support:** Save and review grading data as CSV files
 - **Persistent Storage:** Data is saved locally using SQLite for offline use
 
 ---
